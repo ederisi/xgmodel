@@ -2,7 +2,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from model_trainer import XGModelTrainer
+from xg_trainer import XGModelTrainer
+from cnn_trainer import CNNModelTrainer
 
 st.set_page_config(page_title="Advanced NHL xG Calculator", page_icon="🏒", layout="wide")
 
@@ -10,12 +11,15 @@ st.title("🏒 Advanced Interactive NHL Expected Goals (xG) Calculator")
 st.write("Model considers: shot location, shooter handedness, attacking team performance, and goaltender tier (Top 5 / Bottom 5 / Average Tendie)!")
 
 @st.cache_resource
-def get_trainer():
-    trainer = XGModelTrainer("shots.csv")
-    trainer.train_model()
-    return trainer
+def get_models():
+    xgb_trainer = XGModelTrainer("shots.csv")
+    xgb_trainer.train_model()
+    
+    cnn_trainer = CNNModelTrainer(xgb_trainer.df, xgb_trainer.active_features, xgb_trainer.goal_col)
+    cnn_trainer.train_model(epochs=5)
+    return xgb_trainer, cnn_trainer
 
-trainer = get_trainer()
+trainer, cnn_trainer = get_models()
 
 teams = sorted(list(trainer.categories.get('teamCode', ['TEAM A'])))
 goalies = trainer.goalie_options
@@ -38,8 +42,18 @@ y_coord = st.sidebar.slider("Distance from Net Center (Y Cord)", -42.0, 42.0, 0.
 shot_distance = np.sqrt((89 - x_coord)**2 + y_coord**2)
 is_off_wing = 1 if ((handedness == "L" and y_coord > 5) or (handedness == "R" and y_coord < -5)) else 0
 
-# Predict xG using the trained model
+# Predict xG using the trained xgboost model
 predicted_xg = trainer.predict_shot(
+    distance=shot_distance,
+    x_coord=x_coord,
+    y_coord=y_coord,
+    handedness=handedness,
+    off_wing=is_off_wing,
+    team_code=selected_team,
+    goalie_tier=goalie_choice
+)
+# Predict xG using the trained CNN model
+cnn_predicted_xg = cnn_trainer.predict_shot(
     distance=shot_distance,
     x_coord=x_coord,
     y_coord=y_coord,
@@ -78,15 +92,13 @@ with left_col:
     st.pyplot(fig)
 
 with right_col:
-    st.subheader("📊 Model Expected Goals (xG)")
-    st.metric(label="Calculated xG", value=f"{predicted_xg:.3f}")
-    
-    if predicted_xg > 0.20:
-        st.success("🔥 **Elite Scoring Chance!**")
-    elif predicted_xg > 0.08:
-        st.warning("⚠️ **Good Scoring Look.**")
-    else:
-        st.info("❄️ **Perimeter Shot.**")
+    st.subheader("📊 Model Comparison (xG)")
+    m_col1, m_col2 = st.columns(2)
+    with m_col1:
+        st.metric(label="XGBoost xG", value=f"{predicted_xg:.3f}")
+    with m_col2:
+        diff = cnn_predicted_xg - predicted_xg
+        st.metric(label="1D-CNN xG", value=f"{cnn_predicted_xg:.3f}", delta=f"{diff:+.3f} vs XGB")
         
     st.markdown("---")
     st.write("**Data-Driven Parameters:**")
