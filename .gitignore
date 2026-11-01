@@ -1,0 +1,4 @@
+shots.csv
+__pycache__/
+.streamlit/
+team_x_goals_summary.csv
