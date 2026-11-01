@@ -1,6 +1,6 @@
 import subprocess
 import sys
-from xg_model import XGModelTrainer
+from model_trainer import XGModelTrainer
 
 def main():
     print("=== Initializing NHL xG System ===")
