@@ -2,13 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from xg_trainer import XGModelTrainer
-from cnn_trainer import CNNModelTrainer
-from sklearn_pre import SklearnPreprocessor
-from logreg_trainer import LogRegTrainer
-from rf_trainer import RFTrainer
-from hgb_trainer import HGBTrainer
-from mlp_trainer import MLPTrainer
+from model_loader import get_all_models
 
 # Page configs
 st.set_page_config(
@@ -42,31 +36,6 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
-
-# Cache the model training to avoid retraining on every Streamlit rerun
-@st.cache_resource
-def get_all_models():
-    xgb = XGModelTrainer("shots.csv")
-    xgb.train_model()
-
-    pre = SklearnPreprocessor(xgb.df, xgb.active_features, xgb.goal_col)
-    
-    cnn = CNNModelTrainer(pre)
-    cnn.train_model(epochs=5)
-
-    logreg = LogRegTrainer(pre)
-    logreg.train_model()
-    
-    rf = RFTrainer(pre)
-    rf.train_model()
-    
-    hgb = HGBTrainer(pre)
-    hgb.train_model()
-    
-    mlp = MLPTrainer(pre)
-    mlp.train_model()
-
-    return xgb, cnn, logreg, rf, hgb, mlp
 
 with st.spinner("Loading and training 6 ML models... Wait a moment 🏒"):
     xgb_trainer, cnn_trainer, logreg_trainer, rf_trainer, hgb_trainer, mlp_trainer = get_all_models()
@@ -114,30 +83,32 @@ with tab1:
     col_rink, col_metrics = st.columns([1.5, 1])
     
     with col_rink:
-        st.subheader("Attacking zone visual map")
+        st.subheader("Attacking zone visualization")
         st.write(f"Shot from team **{selected_team}** ({'Off-Wing' if is_off_wing else 'Normal'} angle).")
         
-        # Clean and modern sports analytics style chart
-        fig, ax = plt.subplots(figsize=(7, 4))
-        ax.set_xlim(25, 100)
+        fig, ax = plt.subplots(figsize=(7.5, 4))
+        ax.set_xlim(0, 100)  # Shows the ice from the center line (0) to the goal line (100)
         ax.set_ylim(-45, 45)
         ax.set_facecolor('#0e1117')
         fig.patch.set_facecolor('#0e1117')
         
-        # Lines and goalie box
-        ax.axvline(x=89, color='#ff4b4b', linewidth=2.5, label='Goal line')
-        ax.axvline(x=54, color='#1f77b4', linewidth=1.5, linestyle='--', label='Center line')
+        # Center line (X=0), Blue line (X=25) and goal line (X=89)
+        ax.axvline(x=0, color='#ff4b4b', linewidth=2.5, linestyle=':', label='Center Line')
+        ax.axvline(x=25, color='#1f77b4', linewidth=3.0, label='Blue Line')
+        ax.axvline(x=89, color='#ff4b4b', linewidth=2.0, label='Goal Line')
+        
+        # Goal area
         net_box = plt.Rectangle((89, -3), 3, 6, edgecolor='white', facecolor='#262730', linewidth=1.5, zorder=3)
         ax.add_patch(net_box)
         
-        # Shot location
+        # Shot dot
         marker_color = '#b83280' if is_off_wing == 1 else '#ff4b4b'
-        ax.scatter([x_coord], [y_coord], color=marker_color, s=250, zorder=5, edgecolor='white', linewidth=1.5, label='Laukaus')
+        ax.scatter([x_coord], [y_coord], color=marker_color, s=250, zorder=5, edgecolor='white', linewidth=1.5, label='Shot Location')
         
         ax.tick_params(colors='white')
         ax.xaxis.label.set_color('white')
         ax.yaxis.label.set_color('white')
-        ax.legend(loc='upper left', facecolor='#161b22', edgecolor='none', labelcolor='white')
+        ax.legend(loc='upper left', facecolor='#161b22', edgecolor='none', labelcolor='white', fontsize=8)
         
         st.pyplot(fig)
 
