@@ -55,3 +55,13 @@ class SklearnPreprocessor:
         df_encoded[num_active] = self.scaler.transform(df_encoded[num_active])
 
         return df_encoded.values.astype(np.float32)
+    def transform_batch(self, df_new):
+        """Transforms a new DataFrame into the format required by the models."""
+        cat_active = [c for c in self.cat_cols if c in self.active_features]
+        num_active = [c for c in self.num_cols if c in self.active_features]
+
+        df_encoded = pd.get_dummies(df_new[self.active_features], columns=cat_active, dtype=float)
+        df_encoded = df_encoded.reindex(columns=self.encoded_columns, fill_value=0.0)
+        df_encoded[num_active] = self.scaler.transform(df_encoded[num_active])
+
+        return df_encoded.values.astype(np.float32)
