@@ -1,12 +1,14 @@
 # Load and train all models once into cache to avoid retraining on every Streamlit rerun
 import streamlit as st
-from xg_trainer import XGModelTrainer
-from cnn_trainer import CNNModelTrainer
-from sklearn_pre import SklearnPreprocessor
-from logreg_trainer import LogRegTrainer
-from rf_trainer import RFTrainer
-from hgb_trainer import HGBTrainer
-from mlp_trainer import MLPTrainer
+from trainer.xg_trainer import XGModelTrainer
+from trainer.cnn_trainer import CNNModelTrainer
+from trainer.sklearn_pre import SklearnPreprocessor
+from trainer.logreg_trainer import LogRegTrainer
+from trainer.rf_trainer import RFTrainer
+from trainer.hgb_trainer import HGBTrainer
+from trainer.mlp_trainer import MLPTrainer
+from trainer.gru_trainer import GRUTrainer
+from trainer.lstm_trainer import LSTMTrainer
 
 @st.cache_resource
 def get_all_models():
@@ -16,7 +18,7 @@ def get_all_models():
     pre = SklearnPreprocessor(xgb.df, xgb.active_features, xgb.goal_col)
     
     cnn = CNNModelTrainer(pre)
-    cnn.train_model(epochs=5)
+    cnn.train_model(epochs=10)
     
     logreg = LogRegTrainer(pre)
     logreg.train_model()
@@ -30,4 +32,10 @@ def get_all_models():
     mlp = MLPTrainer(pre)
     mlp.train_model()
     
-    return xgb, cnn, logreg, rf, hgb, mlp
+    lstm = LSTMTrainer(pre)
+    lstm.train_model(epochs=10)
+    
+    gru = GRUTrainer(pre)
+    gru.train_model(epochs=10)
+    
+    return xgb, cnn, logreg, rf, hgb, mlp, lstm, gru

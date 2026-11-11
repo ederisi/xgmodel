@@ -37,12 +37,12 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-with st.spinner("Loading and training 6 ML models... Wait a moment 🏒"):
-    xgb_trainer, cnn_trainer, logreg_trainer, rf_trainer, hgb_trainer, mlp_trainer = get_all_models()
+with st.spinner("Loading and training 8 ML models... Wait a moment 🏒"):
+    xgb_trainer, cnn_trainer, lstm_trainer, gru_trainer, logreg_trainer, rf_trainer, hgb_trainer, mlp_trainer = get_all_models()
 
 # title and description
 st.title("🏒 NHL Expected Goals (xG) Analytics Suite")
-st.markdown("Interactive tool for modeling expected goals (xG) in hockey shot situations and comparing **6 different AI models**.")
+st.markdown("Interactive tool for modeling expected goals (xG) in hockey shot situations and comparing **8 different AI models**.")
 st.markdown("---")
 
 # Sidebar configs
@@ -63,12 +63,37 @@ y_coord = st.sidebar.slider("Distance from goal center (Y-coordinate)", -42.0, 4
 shot_distance = np.sqrt((89 - x_coord)**2 + y_coord**2)
 is_off_wing = 1 if ((handedness == "L" and y_coord > 5) or (handedness == "R" and y_coord < -5)) else 0
 
-shot_args = (shot_distance, x_coord, y_coord, handedness, is_off_wing, selected_team, goalie_choice)
 
-# Predictions from all 6 models
+st.sidebar.markdown("### ⚡ Situational parameters")
+shot_types = sorted(list(xgb_trainer.categories.get('shotType', ['WRIST', 'SLAP', 'SNAP', 'BACK', 'TIP', 'DEFLECTED', 'WRAP'])))
+selected_shot_type = st.sidebar.selectbox("Laukaustyyppi (shotType)", shot_types)
+is_rebound = int(st.sidebar.checkbox("Irtokiekko / Rebound (shotRebound)", value=False))
+is_rush = int(st.sidebar.checkbox("Vastahyökkäys / Rush (shotRush)", value=False))
+
+shot_args = (
+    shot_distance, x_coord, y_coord, handedness, is_off_wing,
+    selected_team, goalie_choice, selected_shot_type, is_rebound, is_rush
+)
+
+st.subheader("📊 Situation's impact on xG from same location")
+situations = {
+    "Basic Shot (Selected)": xgb_trainer.predict_shot(shot_distance, x_coord, y_coord, handedness, is_off_wing, selected_team, goalie_choice, selected_shot_type, 0, 0),
+    "Rush": xgb_trainer.predict_shot(shot_distance, x_coord, y_coord, handedness, is_off_wing, selected_team, goalie_choice, selected_shot_type, 0, 1),
+    "Rebound": xgb_trainer.predict_shot(shot_distance, x_coord, y_coord, handedness, is_off_wing, selected_team, goalie_choice, selected_shot_type, 1, 0),
+    "Rebound + Rush": xgb_trainer.predict_shot(shot_distance, x_coord, y_coord, handedness, is_off_wing, selected_team, goalie_choice, selected_shot_type, 1, 1)
+}
+sit_df = pd.DataFrame({
+    "Situation": list(situations.keys()),
+    "xG (%)": [v * 100 for v in situations.values()]
+})
+st.bar_chart(sit_df.set_index("Situation"), width='stretch')
+
+# Predictions from all 8 models
 all_predictions = {
     "XGBoost": xgb_trainer.predict_shot(*shot_args),
     "1D-CNN": cnn_trainer.predict_shot(*shot_args),
+    "LSTM": lstm_trainer.predict_shot(*shot_args),
+    "GRU": gru_trainer.predict_shot(*shot_args),
     "Logistic Regression": logreg_trainer.predict_shot(*shot_args),
     "Random Forest": rf_trainer.predict_shot(*shot_args),
     "HistGradientBoosting": hgb_trainer.predict_shot(*shot_args),
@@ -138,4 +163,4 @@ with tab2:
     
     with st.spinner("Calculating team statistics..."):
         leaderboard = xgb_trainer.get_team_leaderboard()
-        st.dataframe(leaderboard, use_container_width=True, hide_index=True)
+        st.dataframe(leaderboard, width='stretch', hide_index=True)

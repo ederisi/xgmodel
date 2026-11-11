@@ -6,23 +6,25 @@ from sklearn.metrics import log_loss, brier_score_loss
 class ShotCNN(nn.Module):
     def __init__(self, num_features):
         super(ShotCNN, self).__init__()
-        self.conv1 = nn.Conv1d(in_channels=1, out_channels=16, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv1d(in_channels=1, out_channels=32, kernel_size=3, padding=1)
         self.relu = nn.ReLU()
-        self.conv2 = nn.Conv1d(in_channels=16, out_channels=32, kernel_size=3, padding=1)
+        self.dropout1 = nn.Dropout(0.1)
+        self.conv2 = nn.Conv1d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
         self.flatten = nn.Flatten()
         
-        self.fc1 = nn.Linear(32 * num_features, 64)
-        self.dropout = nn.Dropout(0.2)
-        self.fc2 = nn.Linear(64, 1)
+        self.fc1 = nn.Linear(64 * num_features, 32)
+        self.dropout2 = nn.Dropout(0.2)
+        self.fc2 = nn.Linear(32, 1)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         x = x.unsqueeze(1)
         x = self.relu(self.conv1(x))
+        x = self.dropout1(x)
         x = self.relu(self.conv2(x))
         x = self.flatten(x)
         x = self.relu(self.fc1(x))
-        x = self.dropout(x)
+        x = self.dropout2(x)
         x = self.sigmoid(self.fc2(x))
         return x
 
@@ -44,7 +46,7 @@ class CNNModelTrainer:
 
         self.model = ShotCNN(num_features=X_train.shape[1])
         criterion = nn.BCELoss()
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=0.002)
 
         print(f"\nTraining 1D-CNN xG model ({epochs} epochs)...")
         self.model.train()
@@ -65,14 +67,11 @@ class CNNModelTrainer:
         print(f" -> 1D-CNN Log Loss: {loss:.4f} | Brier Score: {brier:.4f}")
         return self.model
 
-    def predict_shot(self, distance, x_coord, y_coord, handedness, off_wing, team_code, goalie_tier):
-        """Predicts the xG of a single shot using the trained 1D-CNN model."""
+    def predict_shot(self, *args, **kwargs):
         if self.model is None:
             self.train_model()
 
-        X_single = self.pre.transform_single(
-            distance, x_coord, y_coord, handedness, off_wing, team_code, goalie_tier
-        )
+        X_single = self.pre.transform_single(*args, **kwargs)
         
         self.model.eval()
         with torch.no_grad():

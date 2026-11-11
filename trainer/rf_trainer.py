@@ -17,8 +17,8 @@ class RFTrainer:
         print(f" -> Random Forest Log Loss: {loss:.4f} | Brier Score: {brier:.4f}")
         return self.model
 
-    def predict_shot(self, distance, x_coord, y_coord, handedness, off_wing, team_code, goalie_tier):
+    def predict_shot(self, *args, **kwargs):
         if self.model is None:
             self.train_model()
-        X_single = self.pre.transform_single(distance, x_coord, y_coord, handedness, off_wing, team_code, goalie_tier)
-        return float(self.model.predict_proba(X_single)[:, 1][0])
+        X_single = self.pre.transform_single(*args, **kwargs)
+        return float(self.model.predict_proba(X_single)[0, 1])
