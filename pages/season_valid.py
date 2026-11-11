@@ -27,7 +27,7 @@ with st.spinner("Initializing models..."):
     xgb_trainer, cnn_trainer, lstm_trainer, gru_trainer, logreg_trainer, rf_trainer, hgb_trainer, mlp_trainer, pre, simulator = load_validator_resources()
 
 st.title("📈 New data & season validation (vs. MoneyPuck)")
-st.markdown("Upload a new season's MoneyPuck CSV file and compare the performance of your **6 models + Ensemble** against MoneyPuck's official xG model (`xGoal`).")
+st.markdown("Upload a new season's MoneyPuck CSV file and compare the performance of your **8 models + Ensemble** against MoneyPuck's official xG model (`xGoal`).")
 st.markdown("---")
 
 uploaded_file = st.file_uploader("📂 Upload a new season's MoneyPuck CSV file (e.g., shots_2025.csv)", type=["csv"])
@@ -36,15 +36,22 @@ if uploaded_file is not None:
     @st.cache_data
     def evaluate_uploaded_season(file_bytes):
         df_new = pd.read_csv(file_bytes)
+        if 'game_id' in df_new.columns and 'time' in df_new.columns:
+            df_new = df_new.sort_values(['game_id', 'time']).reset_index(drop=True)
+        else:
+            df_new = df_new.copy()
+
         goal_col = 'isGoal' if ('isGoal' in df_new.columns and 'goal' not in df_new.columns) else 'goal'
         
         special_goalies = set(xgb_trainer.goalie_options) - {"Average Tendie"}
         if 'goalieNameForShot' in df_new.columns:
-            df_new['goalieTier'] = df_new['goalieNameForShot'].apply(
+            goalie_tier_series = df_new['goalieNameForShot'].apply(
                 lambda x: x if x in special_goalies else "Average Tendie"
             )
         else:
-            df_new['goalieTier'] = "Average Tendie"
+            goalie_tier_series = "Average Tendie"
+            
+        df_new = df_new.assign(goalieTier=goalie_tier_series)
 
         active_features = [f for f in xgb_trainer.active_features if f in df_new.columns]
         
@@ -52,21 +59,25 @@ if uploaded_file is not None:
         has_moneypuck = 'xGoal' in df_new.columns
         if has_moneypuck:
             required_cols.append('xGoal')
-            
-        clean_df = df_new.dropna(subset=required_cols).copy()
 
-        # Xgboost predictions
+        meta_cols = [c for c in ['game_id', 'time', 'homeTeamCode', 'awayTeamCode', 'isHomeTeam', 'teamCode', 'shooterTeamCode'] if c in df_new.columns]
+        keep_cols = list(dict.fromkeys(required_cols + meta_cols))
+            
+        clean_df = df_new[keep_cols].dropna(subset=required_cols).copy()
+        if 'game_id' in clean_df.columns and 'time' in clean_df.columns:
+            clean_df = clean_df.sort_values(['game_id', 'time']).reset_index(drop=True)
+        
+        # 1. XGBoost predictions
         xgb_df = clean_df[active_features].copy()
         for col, cats in xgb_trainer.categories.items():
             if col in xgb_df.columns:
                 xgb_df[col] = pd.Categorical(xgb_df[col], categories=cats)
         clean_df['xG_XGBoost'] = np.clip(xgb_trainer.model.predict_proba(xgb_df)[:, 1], 0.001, 0.999)
 
-        # PyTorch-based DNNs (CNN, LSTM, GRU)
+        # 2. PyTorch-based DNNs (CNN, LSTM, GRU)
         X_scaled = pre.transform_batch(clean_df)
         X_seq = pre.transform_batch_sequences(clean_df)
         
-        # Only for pytorch models
         cnn_trainer.model.eval()
         with torch.no_grad():
             clean_df['xG_1D-CNN'] = np.clip(cnn_trainer.model(torch.tensor(X_scaled)).numpy().flatten(), 0.001, 0.999)
@@ -78,7 +89,7 @@ if uploaded_file is not None:
                 preds = trainer.model(X_seq_tensor).numpy().flatten()
                 clean_df[f'xG_{name}'] = np.clip(preds, 0.001, 0.999)
 
-        # SKlearn models predictions
+        # 3. Sklearn models predictions
         clean_df['xG_LogReg'] = np.clip(logreg_trainer.model.predict_proba(X_scaled)[:, 1], 0.001, 0.999)
         clean_df['xG_RandomForest'] = np.clip(rf_trainer.model.predict_proba(X_scaled)[:, 1], 0.001, 0.999)
         clean_df['xG_HistGB'] = np.clip(hgb_trainer.model.predict_proba(X_scaled)[:, 1], 0.001, 0.999)
@@ -167,6 +178,7 @@ if uploaded_file is not None:
                     expected_winner_own = home if sim_own['home_win_prob'] >= 50.0 else away
                     correct_own = (actual_winner == expected_winner_own) if actual_winner != "OT/SO" else None
 
+                    # KORJATTU: Merkkijonot yhdellä rivillä ilman rivinvaihtovirheitä
                     row_data = {
                         "Game ID": gid,
                         "Game": f"{away} @ {home}",
@@ -183,16 +195,16 @@ if uploaded_file is not None:
                         sim_mp = simulator.simulate_from_xg_arrays(mp_h_xg, mp_a_xg, num_simulations=1000)
                         
                         row_data["MoneyPuck xG (H - A)"] = f"{sim_mp['home_xG']:.2f} - {sim_mp['away_xG']:.2f}"
-                        row_data["MoneyPuck xWin% (H - V)"] = f"{sim_mp['home_win_prob']:.1f}% - {sim_mp['away_win_prob']:.1f}%"
+                        row_data["MoneyPuck xWin% (H - A)"] = f"{sim_mp['home_win_prob']:.1f}% - {sim_mp['away_win_prob']:.1f}%"
                         
                         expected_winner_mp = home if sim_mp['home_win_prob'] >= 50.0 else away
                         correct_mp = (actual_winner == expected_winner_mp) if actual_winner != "OT/SO" else None
 
                     row_data.update({
-                        f"{model_label} xWin% (H - V)": f"{sim_own['home_win_prob']:.1f}% - {sim_own['away_win_prob']:.1f}%",
+                        f"{model_label} xWin% (H - A)": f"{sim_own['home_win_prob']:.1f}% - {sim_own['away_win_prob']:.1f}%",
                         "Favorite (Model)": expected_winner_own,
                         "True Winner": actual_winner,
-                        f"Model Correct?": "✅ Yes" if correct_own is True else ("❌ No" if correct_own is False else "➖ OT/SO")
+                        "Model Correct?": "✅ Yes" if correct_own is True else ("❌ No" if correct_own is False else "➖ OT/SO")
                     })
                     
                     if include_mp:
@@ -205,14 +217,14 @@ if uploaded_file is not None:
                 games_df = simulate_all_season_games(clean_df, selected_xg_col, goal_col, has_mp)
 
             decided_games = games_df[games_df["True Winner"] != "OT/SO"]
-            accuracy_own = (games_df["Favorite (Model)"] == games_df["True Winner"]).mean() * 100 if len(games_df) > 0 else 0.0
+            accuracy_own = (decided_games["Favorite (Model)"] == decided_games["True Winner"]).mean() * 100 if len(decided_games) > 0 else 0.0
             
             c1, c2, c3 = st.columns(3)
             c1.metric("Played matches", f"{len(games_df)} kpl")
             c2.metric(f"xWin Winner Accuracy ({model_label})", f"{accuracy_own:.1f} %")
             
-            if has_mp and "MoneyPuck Correct?" in games_df.columns:
-                accuracy_mp = (games_df["MoneyPuck Correct?"].str.contains("✅")).mean() * 100
+            if has_mp and "MoneyPuck Correct?" in decided_games.columns and len(decided_games) > 0:
+                accuracy_mp = (decided_games["MoneyPuck Correct?"].str.contains("✅")).mean() * 100
                 c3.metric("xWin Winner Accuracy (MoneyPuck)", f"{accuracy_mp:.1f} %")
             else:
                 c3.metric("Surprises / Upsets", f"{100 - accuracy_own:.1f} %")

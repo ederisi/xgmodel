@@ -41,7 +41,8 @@ class LSTMTrainer:
 
         self.model = ShotLSTM(num_features=X_train.shape[2])
         criterion = nn.BCELoss()
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
+        optimizer = torch.optim.AdamW(self.model.parameters(), lr=0.001, weight_decay=1e-4)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
 
         print(f"\nTraining True Sequence LSTM xG model ({epochs} epochs, seq_len={self.pre.seq_len})...")
         self.model.train()
@@ -52,9 +53,15 @@ class LSTMTrainer:
                 loss = criterion(outputs, batch_y)
                 loss.backward()
                 optimizer.step()
-
+            scheduler.step()
         self.model.eval()
         with torch.no_grad():
+            train_preds = self.model(torch.tensor(X_train)).numpy().flatten()
+            mean_pred = float(np.clip(train_preds.mean(), 1e-5, 1 - 1e-5))
+            target_mean = float(y_train.mean())
+            logit_shift = np.log(target_mean / (1.0 - target_mean)) - np.log(mean_pred / (1.0 - mean_pred))
+            self.model.fc2.bias.data += float(logit_shift)
+
             preds = self.model(torch.tensor(X_test)).numpy().flatten()
             
         print(f" -> Sequence LSTM Log Loss: {log_loss(y_test, preds):.4f} | Brier Score: {brier_score_loss(y_test, preds):.4f}")
@@ -65,9 +72,7 @@ class LSTMTrainer:
             self.train_model()
 
         X_single = self.pre.transform_single(*args, **kwargs)
-        # In single shot simulation, the current shot is set as the last step of the sequence
-        X_seq = np.zeros((1, self.pre.seq_len, X_single.shape[1]), dtype=np.float32)
-        X_seq[0, -1, :] = X_single[0]
+        X_seq = np.repeat(X_single[:, np.newaxis, :], self.pre.seq_len, axis=1)
 
         self.model.eval()
         with torch.no_grad():

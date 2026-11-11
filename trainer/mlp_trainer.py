@@ -8,7 +8,7 @@ class MLPTrainer:
 
     def train_model(self):
         print("\nTraining MLP Neural Network xG model...")
-        self.model = MLPClassifier(hidden_layer_sizes=(64, 32), max_iter=20, random_state=42)
+        self.model = MLPClassifier(hidden_layer_sizes=(64, 32), max_iter=100, random_state=42)
         self.model.fit(self.pre.X_train, self.pre.y_train)
         
         preds = self.model.predict_proba(self.pre.X_test)[:, 1]

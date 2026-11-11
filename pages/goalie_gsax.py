@@ -129,11 +129,11 @@ if data_source == "📂 Training data (shots.csv)" or uploaded_csv is not None:
         best_g = g_df.iloc[0]
         worst_g = g_df.iloc[-1]
         m1, m2, m3 = st.columns(3)
-        m1.metric("🥇 Paras GSAX-maalivahti", f"{best_g['goalieNameForShot']}", f"+{best_g['GSAX (Model)']:.2f} GSAX")
-        m2.metric("🥶 Heikoin GSAX-maalivahti", f"{worst_g['goalieNameForShot']}", f"{worst_g['GSAX (Model)']:.2f} GSAX")
-        m3.metric("Suodatetut maalivahdit", f"{len(g_df)} kpl", f"Min. {min_shots} laukausta")
+        m1.metric("🥇 Best GSAX-goalie", f"{best_g['goalieNameForShot']}", f"+{best_g['GSAX (Model)']:.2f} GSAX")
+        m2.metric("🥶 Weakest GSAX-goalie", f"{worst_g['goalieNameForShot']}", f"{worst_g['GSAX (Model)']:.2f} GSAX")
+        m3.metric("Filtered goalies", f"{len(g_df)} kpl", f"Min. {min_shots} laukausta")
 
-    st.subheader(f"📊 Maalivahtien GSAX-tulostaulukko ({selected_model.replace('xG_', '')})")
+    st.subheader(f"📊 Goalie GSAX-Board ({selected_model.replace('xG_', '')})")
     st.dataframe(g_df, width='stretch', hide_index=True)
 
     # Visual Top 10 vs Bottom 10 GSAX -chart

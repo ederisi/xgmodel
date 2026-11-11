@@ -2,13 +2,13 @@
 import streamlit as st
 from trainer.xg_trainer import XGModelTrainer
 from trainer.cnn_trainer import CNNModelTrainer
+from trainer.lstm_trainer import LSTMTrainer
+from trainer.gru_trainer import GRUTrainer
 from trainer.sklearn_pre import SklearnPreprocessor
 from trainer.logreg_trainer import LogRegTrainer
 from trainer.rf_trainer import RFTrainer
 from trainer.hgb_trainer import HGBTrainer
 from trainer.mlp_trainer import MLPTrainer
-from trainer.gru_trainer import GRUTrainer
-from trainer.lstm_trainer import LSTMTrainer
 
 @st.cache_resource
 def get_all_models():
@@ -38,4 +38,4 @@ def get_all_models():
     gru = GRUTrainer(pre)
     gru.train_model(epochs=10)
     
-    return xgb, cnn, logreg, rf, hgb, mlp, lstm, gru
+    return xgb, cnn, lstm, gru, logreg, rf, hgb, mlp
