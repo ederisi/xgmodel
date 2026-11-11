@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from xgboost import xgb
+import xgboost as xgb
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import log_loss, brier_score_loss
 
@@ -113,3 +113,29 @@ class XGModelTrainer:
                 input_df[col] = pd.Categorical(input_df[col], categories=cats)
 
         return float(self.model.predict_proba(input_df)[0, 1])
+
+
+    def get_team_leaderboard(self):
+        """Computes the xG leaderboard for teams based on the trained model."""
+        clean_df = self.df.dropna(subset=self.active_features + [self.goal_col]).copy()
+        
+        # Ennustetaan xG koko datalle XGBoostilla
+        xgb_df = clean_df[self.active_features].copy()
+        for col, cats in self.categories.items():
+            if col in xgb_df.columns:
+                xgb_df[col] = pd.Categorical(xgb_df[col], categories=cats)
+        
+        clean_df['xG'] = self.model.predict_proba(xgb_df)[:, 1]
+        team_col = 'teamCode' if 'teamCode' in clean_df.columns else 'shooterTeamCode'
+
+        leaderboard = clean_df.groupby(team_col, observed=False).agg(
+            Shots=(self.goal_col, 'count'),
+            Actual_Goals=(self.goal_col, 'sum'),
+            Total_xG=('xG', 'sum')
+        ).reset_index()
+
+        leaderboard['Total_xG'] = leaderboard['Total_xG'].round(2)
+        leaderboard['Goals_Above_Expected'] = (leaderboard['Actual_Goals'] - leaderboard['Total_xG']).round(2)
+        leaderboard = leaderboard.sort_values(by='Total_xG', ascending=False).reset_index(drop=True)
+        
+        return leaderboard

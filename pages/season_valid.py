@@ -62,19 +62,16 @@ if uploaded_file is not None:
                 xgb_df[col] = pd.Categorical(xgb_df[col], categories=cats)
         clean_df['xG_XGBoost'] = np.clip(xgb_trainer.model.predict_proba(xgb_df)[:, 1], 0.001, 0.999)
 
-        # Scaled feature models predictions
+        # PyTorch-based DNNs (CNN, LSTM, GRU)
         X_scaled = pre.transform_batch(clean_df)
-
-        # 1D-CNN predictions
+        X_seq = pre.transform_batch_sequences(clean_df)
+        
+        # Only for pytorch models
         cnn_trainer.model.eval()
         with torch.no_grad():
-            cnn_preds = cnn_trainer.model(torch.tensor(X_scaled)).numpy().flatten()
-            clean_df['xG_1D-CNN'] = np.clip(cnn_preds, 0.001, 0.999)
+            clean_df['xG_1D-CNN'] = np.clip(cnn_trainer.model(torch.tensor(X_scaled)).numpy().flatten(), 0.001, 0.999)
 
-        # 3D-sequence models predictions (LSTM & GRU)
-        X_seq = pre.transform_batch_sequences(clean_df)
         X_seq_tensor = torch.tensor(X_seq)
-
         for name, trainer in [('LSTM', lstm_trainer), ('GRU', gru_trainer)]:
             trainer.model.eval()
             with torch.no_grad():

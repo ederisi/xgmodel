@@ -66,9 +66,9 @@ is_off_wing = 1 if ((handedness == "L" and y_coord > 5) or (handedness == "R" an
 
 st.sidebar.markdown("### ⚡ Situational parameters")
 shot_types = sorted(list(xgb_trainer.categories.get('shotType', ['WRIST', 'SLAP', 'SNAP', 'BACK', 'TIP', 'DEFLECTED', 'WRAP'])))
-selected_shot_type = st.sidebar.selectbox("Laukaustyyppi (shotType)", shot_types)
-is_rebound = int(st.sidebar.checkbox("Irtokiekko / Rebound (shotRebound)", value=False))
-is_rush = int(st.sidebar.checkbox("Vastahyökkäys / Rush (shotRush)", value=False))
+selected_shot_type = st.sidebar.selectbox("Shot Type", shot_types)
+is_rebound = int(st.sidebar.checkbox("Rebound (shotRebound)", value=False))
+is_rush = int(st.sidebar.checkbox("Rush (shotRush)", value=False))
 
 shot_args = (
     shot_distance, x_coord, y_coord, handedness, is_off_wing,

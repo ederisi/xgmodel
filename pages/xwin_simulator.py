@@ -15,7 +15,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 with st.spinner("Initializing models and simulator..."):
-    xgb_trainer, cnn_trainer, logreg_trainer, rf_trainer, hgb_trainer, mlp_trainer = get_all_models()
+    xgb_trainer, cnn_trainer, lstm_trainer, gru_trainer, logreg_trainer, rf_trainer, hgb_trainer, mlp_trainer = get_all_models()
     simulator = GameWinSimulator(xgb_trainer)
 
 st.title("🎲 NHL Expected Win (xWin%) Simulator")
