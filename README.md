@@ -1,26 +1,26 @@
 # 🏒 NHL Expected Goals (xG) & Expected Win (xWin) Analytics Suite
 
-Modulaarinen koneoppimis- ja syväoppimisjärjestelmä NHL-laukausten maaliodottaman (**xG**), ottelukohtaisten voittotodennäköisyyksien (**xWin%**) ja maalivahtien torjuntatehokkuuden (**GSAX**) mallintamiseen. Sovellus sisältää interaktiivisen **Streamlit**-käyttöliittymän ja vertaa **8 eri tekoälymallia + Ensemble-yhdistelmämallia** suoraan MoneyPuckin viralliseen `xGoal`-malliin.
+Modular ML and Dnn system for NHL's expected goal (xG), expected win% (xWin%) and goalie save above expected (GSAX) modelling. Application includes an interactive streamlit-UI and compares eight different models with Moneypuck's own xGoal/xWin model.
 
 ---
 
-## ✨ Keskeiset ominaisuudet
+## ✨ Features
 
-* **🤖 8 ML/DL-mallin arkkitehtuuri + Ensemble:**
-  * **Puupohjaiset & Gradient Boosting -mallit:** `XGBoost`, `HistGradientBoosting`, `Random Forest`.
-  * **Aikasarja- ja syväoppimismallit (PyTorch):** `1D-CNN` (konvoluutioverkko BatchNorm- ja Logit-kalibroinnilla) sekä aidot sekvenssipohjaiset `Sequence LSTM`- ja `Sequence GRU`-mallit, jotka analysoivat ottelun 4 peräkkäisen laukauksen ketjuja (`seq_len=4`).
-  * **Klassiset & Neuroverkkomallit (Scikit-Learn):** `Logistic Regression`, `MLP Neural Network`.
-  * **Log-Odds Bias -kalibrointi:** PyTorch-mallien ulostulot kalibroidaan automaattisesti vastaamaan koulutusdatan todellista maalikeskiarvoa.
-* **⚡ Edistynyt piirteiden erottelu (Feature Engineering):**
-  * Hyödyntää laukaisuetäisyyttä, koordinaatteja (`X`, `Y`), automaattisesti laskettua laukaisukulmaa (`shotAngleAdjusted`), kätisyyttä (`offWing`), laukaustyyppiä (`shotType`), irtokiekkoja (`shotRebound`), vastahyökkäyksiä (`shotRush`), joukkuetta ja maalivahtitasoa (`goalieTier`).
-* **🎯 Interaktiivinen Laukaisukartta & Tilanneanalyysi (`app.py`):**
-  * Säädä laukauksen paikkaa ja pelitilannetta reaaliajassa hyökkäysalueen kenttäkartalla ja vertaa kaikkien 8 mallin antamia xG-arvoja sekä pelitilanteen (Rush / Rebound) vaikutusta.
-* **🎲 Monte Carlo xWin -ottelusimulaattori (`pages/xwin_simulator.py` & `xwin_simul.py`):**
-  * Simuloi ottelun lopputulokset 10 000 kertaa yksittäisten laukausten xG-arvojen perusteella ja laskee molemmille joukkueille voittotodennäköisyyden (`xWin%`).
-* **📈 Uuden kauden validointi vs. MoneyPuck (`pages/season_valid.py`):**
-  * Lataa uuden kauden CSV-tiedosto (esim. `shots_2026.csv`) ja vertaa mallien tarkkuutta (**Log Loss**, **Brier Score**, **Predicted Total xG** ja **xWin Winner Accuracy**) MoneyPuckin malliin.
-* **🥅 Maalivahtien GSAX-analyysi (`pages/goalie_gsax.py`):**
-  * Laskee maalivahtikohtaisen **Goals Saved Above Expected (GSAX = Kohdattu xG − Päästetyt maalit)** -tilaston valitulla mallilla ja suodattaa tulokset kohdattujen laukausten määrän mukaan.
+* **🤖 8 ML/DL-model architecture + Ensemble:**
+  * **Treebased & Gradient Boosting -models:** `XGBoost`, `HistGradientBoosting`, `Random Forest`.
+  * **Timeseries- ja deep learning models (PyTorch):** `1D-CNN` (convolutional network with BatchNorm- ja Logit-calibration) and sequencebased `Sequence LSTM`- ja `Sequence GRU`-models, which analyze the shot's as a chain with a length of four (`seq_len=4`).
+  * **Classical and neural network models (Scikit-Learn):** `Logistic Regression`, `MLP Neural Network`.
+  * **Log-Odds Bias -calibrating:** PyTorch-models outputs are calibrated automatically to respond to training data's true goal average.
+* **⚡ Feature Engineering:**
+  * Utilizes shot distance, coordinates (`X`, `Y`), shot angle (`shotAngleAdjusted`), handedness (`offWing`), type (`shotType`), rebounds (`shotRebound`), rushes (`shotRush`), team and goalie tier(`goalieTier`).
+* **🎯 Interactive shot map & Situational analysis (`app.py`):**
+  * Move shot location and game situation in real time in the offensive zone map. Compare the 8 model's given xG-values and situational impact (Rush/Rebound).
+* **🎲 Monte Carlo xWin -match simulator (`pages/xwin_simulator.py` & `xwin_simul.py`):**
+  * Simulates match outcome 10 000 times based on single shot xG-values and calculates the expected win probability for both teams (`xWin%`).
+* **📈 New season validation vs. MoneyPuck (`pages/season_valid.py`):**
+  * Loads new season's data (fe. `shots_2026.csv`) and compares model accuracy (**Log Loss**, **Brier Score**, **Predicted Total xG** ja **xWin Winner Accuracy**) to moneypuck's model.
+* **🥅 Goalie's GSAX-analyysi (`pages/goalie_gsax.py`):**
+  * Computes goalie specific **Goals Saved Above Expected (GSAX = faced xG − Actual goals)** -stats with chosen goalie and filters results based on actual faced shots.
 
 ---
 
@@ -29,31 +29,32 @@ Modulaarinen koneoppimis- ja syväoppimisjärjestelmä NHL-laukausten maaliodott
 ```text
 xgmodel/
 │
-├── app.py                        # Pääsivu: Interaktiivinen laukaisukartta, 8 mallin xG-vertailu & Leaderboard
-├── main.py                       # Käynnistysskripti Streamlit-palvelimelle
-├── model_loader.py               # Alustaa, kouluttaa ja välimuistittaa (@st.cache_resource) kaikki 8 mallia
-├── xwin_simul.py                 # Monte Carlo -ottelusimulaattorin laskentalogiikka (GameWinSimulator)
+├── app.py                        # Main Page: Interactive shot map, 8 model xG comparison & Leaderboard
+├── main.py                       # Run script for the streamlit server
+├── model_loader.py               # Initializes, trains and caches (@st.cache_resource) all 8 models
+├── xwin_simul.py                 # Monte Carlo -match simulator computation logic
 │
-├── pages/                        # Streamlitin monisivuiset analyysinäkymät
-│   ├── goalie_gsax.py            # Maalivahtien GSAX-analyysi ja Top/Bottom-visualisointi
-│   ├── season_valid.py           # Uuden kauden CSV-validointi (Log Loss, Brier Score & xWin vs. MoneyPuck)
-│   └── xwin_simulator.py         # Ottelukohtainen xWin-simulaattori käyttöliittymällä
+├── pages/                        # Streamlit's multi tab analysis views
+│   ├── goalie_gsax.py            # Goalie GSAX-analysis ja Top/Bottom-visualisation
+│   ├── season_valid.py           # New season's csv validation (Log Loss, Brier Score & xWin vs. MoneyPuck)
+│   └── xwin_simulator.py         # Match specific xwin simulator, with input parameter tuning
 │
-├── trainer/                      # Modulaariset koneoppimis- ja syväoppimismallit
-│   ├── __init__.py               # Paketin alustus
-│   ├── xg_trainer.py             # XGBoost-malli, datan lataus ja piirteiden valmistelu
-│   ├── sklearn_pre.py            # StandardScaler, One-Hot-koodaus & 3D-sekvenssien (seq_len=4) rakennus
-│   ├── cnn_trainer.py            # PyTorch 1D-CNN -malli + Log-Odds-kalibrointi
-│   ├── lstm_trainer.py           # PyTorch True Sequence LSTM -malli
-│   ├── gru_trainer.py            # PyTorch True Sequence GRU -malli
-│   ├── hgb_trainer.py            # Scikit-Learn HistGradientBoosting -malli
-│   ├── rf_trainer.py             # Scikit-Learn Random Forest -malli
-│   ├── logreg_trainer.py         # Scikit-Learn Logistic Regression -malli
-│   └── mlp_trainer.py            # Scikit-Learn Multi-Layer Perceptron (MLP) -neuroverkko
+├── trainer/                      # Modular ML and Dnn models
+│   ├── __init__.py               # Packet initialization
+│   ├── xg_trainer.py             # XGBoost-model, data loading and data preprocessing
+│   ├── sklearn_pre.py            # StandardScaler, One-Hot encoding & 3D-sequence (seq_len=4) building
+│   ├── cnn_trainer.py            # PyTorch 1D-CNN -model + Log-Odds-calibration
+│   ├── lstm_trainer.py           # PyTorch True Sequence LSTM -model
+│   ├── gru_trainer.py            # PyTorch True Sequence GRU -model
+│   ├── hgb_trainer.py            # Scikit-Learn HistGradientBoosting -model
+│   ├── rf_trainer.py             # Scikit-Learn Random Forest -model
+│   ├── logreg_trainer.py         # Scikit-Learn Logistic Regression -model
+│   └── mlp_trainer.py            # Scikit-Learn Multi-Layer Perceptron (MLP) -neural network
 │
-├── shots.csv                     # Koulutusdata (MoneyPuck NHL shot data)
-├── shots_2026.csv                # Testi-/validointikauden laukausdata
-└── team_x_goals_summary.csv      # Joukkuetason yhteenvetodata
+├── shots.csv                     # Training data (MoneyPuck NHL shot data)
+├── shots_2026.csv                # Test-/Validation seasons shot data
+└── team_x_goals_summary.csv      # Team level summary
+```
 
 ## How to setup
 - Ensure you have Python 3.10+ version
