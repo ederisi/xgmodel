@@ -1,3 +1,7 @@
+"""
+Main UI for the NHL xG & xWin Analytics Dashboard.
+This script defines the Streamlit application that provides an interactive interface for analyzing expected goals (xG) in hockey shot situations using multiple machine learning models.
+"""
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -37,10 +41,11 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# Load and cache all 8 models
 with st.spinner("Loading and training 8 ML models... Wait a moment 🏒"):
     xgb_trainer, cnn_trainer, lstm_trainer, gru_trainer, logreg_trainer, rf_trainer, hgb_trainer, mlp_trainer = get_all_models()
 
-# title and description
+# Main title and description
 st.title("🏒 NHL Expected Goals (xG) Analytics Suite")
 st.markdown("Interactive tool for modeling expected goals (xG) in hockey shot situations and comparing **8 different AI models**.")
 st.markdown("---")
@@ -56,20 +61,23 @@ selected_team = st.sidebar.selectbox("🏟️ Attacking team", teams)
 handedness = st.sidebar.selectbox("✋ Shooter handedness", handedness_options)
 goalie_choice = st.sidebar.selectbox("🛡️ Goalie", goalies)
 
+# Shot location on field (with inputs)
 st.sidebar.markdown("### 📍 Shot location on the ice")
 x_coord = st.sidebar.slider("Distance from center line (X-coordinate)", 25.0, 89.0, 68.0)
 y_coord = st.sidebar.slider("Distance from goal center (Y-coordinate)", -42.0, 42.0, 0.0)
 
+# Calculate derived features
 shot_distance = np.sqrt((89 - x_coord)**2 + y_coord**2)
 is_off_wing = 1 if ((handedness == "L" and y_coord > 5) or (handedness == "R" and y_coord < -5)) else 0
 
-
+# Advanced situational parameters
 st.sidebar.markdown("### ⚡ Situational parameters")
 shot_types = sorted(list(xgb_trainer.categories.get('shotType', ['WRIST', 'SLAP', 'SNAP', 'BACK', 'TIP', 'DEFLECTED', 'WRAP'])))
 selected_shot_type = st.sidebar.selectbox("Shot Type", shot_types)
 is_rebound = int(st.sidebar.checkbox("Rebound (shotRebound)", value=False))
 is_rush = int(st.sidebar.checkbox("Rush (shotRush)", value=False))
 
+# Collect parameters in tuple formation for models
 shot_args = (
     shot_distance, x_coord, y_coord, handedness, is_off_wing,
     selected_team, goalie_choice, selected_shot_type, is_rebound, is_rush
@@ -87,14 +95,16 @@ all_predictions = {
     "HistGradientBoosting": hgb_trainer.predict_shot(*shot_args),
     "MLP Neural Net": mlp_trainer.predict_shot(*shot_args)
 }
+# Calculate average xG across all models
 avg_xg = np.mean(list(all_predictions.values()))
 
-# Main formatted output with tabs
+# Tabs for different sections of the dashboard
 tab1, tab2 = st.tabs(["🎯 Shot Map & Prediction", "🏆 Team Statistics (Leaderboard)"])
 
 with tab1:
     col_rink, col_metrics = st.columns([1.5, 1])
-    
+
+    # Left column: Attacking zone visualiation
     with col_rink:
         st.subheader("Attacking zone visualization")
         st.write(f"Shot from team **{selected_team}** ({'Off-Wing' if is_off_wing else 'Normal'} angle).")
@@ -125,12 +135,13 @@ with tab1:
         
         st.pyplot(fig)
 
+    # Right column: Metrics and model predictions
     with col_metrics:
         st.subheader("📊 Expected Goals (xG)")
         
         # Main metric for average xG across all models
         st.metric(
-            label="⭐ Ensemble Average (6 models)", 
+            label="⭐ Ensemble Average (8 models)", 
             value=f"{avg_xg:.3f}",
             delta="High danger situation" if avg_xg > 0.15 else "Normal situation"
         )
@@ -138,7 +149,7 @@ with tab1:
         st.markdown("<br>", unsafe_allow_html=True)
         st.write("**Model-specific results:**")
         
-        # Models in two clean columns
+        # Models in two columns
         m_cols = st.columns(2)
         for idx, (model_name, xg_val) in enumerate(all_predictions.items()):
             with m_cols[idx % 2]:
@@ -146,7 +157,8 @@ with tab1:
                 st.metric(label=model_name, value=f"{xg_val:.3f}", delta=f"{diff:+.3f}")
     st.markdown("---")
     st.subheader("📊 Situational impact on same shot position")
-    
+
+    # Compute same xG for different situational contexts
     situations = {
         "Basic shots": xgb_trainer.predict_shot(shot_distance, x_coord, y_coord, handedness, is_off_wing, selected_team, goalie_choice, selected_shot_type, 0, 0),
         "Rush": xgb_trainer.predict_shot(shot_distance, x_coord, y_coord, handedness, is_off_wing, selected_team, goalie_choice, selected_shot_type, 0, 1),
@@ -164,6 +176,7 @@ with tab1:
                 delta=f"{((xg_val - situations['Peruslaukaus']) * 100):+.1f}%" if idx > 0 else "Perustaso"
             )
 
+# Seonnd tab: Team stats leaderboard
 with tab2:
     st.subheader("Team Statistics (Leaderboard)")
     st.write("Based on the sum of all shots' expected goals (xG) values.")

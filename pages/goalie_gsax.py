@@ -1,3 +1,8 @@
+"""
+Goalie GSAX (Goals Saved Above Expected) Analytics Streamlit App
+This script defines the Streamlit application that provides an interactive interface for analyzing goalie performance in hockey shot situations 
+using multiple machine learning models. The app calculates the GSAX metric, which measures a goalie's performance relative to expected goals (xG).
+"""
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -5,8 +10,10 @@ import torch
 import matplotlib.pyplot as plt
 from model_loader import get_all_models
 
+# Page configs
 st.set_page_config(page_title="Goalie GSAX Analytics", page_icon="🥅", layout="wide")
 
+# Custom CSS-style (cards, font and colors)
 st.markdown("""
     <style>
     .main { background-color: #0e1117; }
@@ -16,15 +23,21 @@ st.markdown("""
 
 @st.cache_resource
 def load_goalie_resources():
+    """
+    Load and cache all 8 models and the preprocessor for the Goalie GSAX Analytics app.
+    """
     xgb, cnn, lstm, gru, logreg, rf, hgb, mlp = get_all_models()
     return xgb, cnn, lstm, gru, logreg, rf, hgb, mlp, logreg.pre
 
+# Load models and preprocessor
 xgb_trainer, cnn_trainer, lstm_trainer, gru_trainer, logreg_trainer, rf_trainer, hgb_trainer, mlp_trainer, pre = load_goalie_resources()
 
+# Main title and description
 st.title("🥅 NHL Goalie GSAX (Goals Saved Above Expected) Analytics")
 st.markdown("Analyze goalies' performance relative to expected goals (**GSAX = Observed xG − Goals Allowed**). A positive GSAX indicates the goalie has saved more goals than expected.")
 st.markdown("---")
 
+# Choose data source: either the default training data or upload a new season CSV file
 data_source = st.radio(
     "Choose data source:",
     ["📂 Training data (shots.csv)", "⬆️ Upload new season CSV file"],
@@ -37,14 +50,18 @@ if data_source == "⬆️ Upload new season CSV file":
 
 @st.cache_data
 def compute_goalie_predictions(file_bytes=None):
+    """
+    Compute xG predictions for goalies based on the provided CSV file or the default training data.
+    """
     df = pd.read_csv(file_bytes) if file_bytes is not None else xgb_trainer.df.copy()
     goal_col = 'isGoal' if ('isGoal' in df.columns and 'goal' not in df.columns) else 'goal'
-    
+
+    # Reorder dataframe by game_id and time if those columns exist
     if 'game_id' in df.columns and 'time' in df.columns:
         df = df.sort_values(['game_id', 'time']).reset_index(drop=True)
 
     # Evaluate goalies objectively (compared to"Average Tendie"),
-    # in order for the GSAX to compare to average goalie!
+    # in order for the GSAX to compare to average goalie
     df['goalieTier'] = "Average Tendie"
     active_features = [f for f in xgb_trainer.active_features if f in df.columns]
     
@@ -76,11 +93,13 @@ def compute_goalie_predictions(file_bytes=None):
         with torch.no_grad():
             clean_df[f'xG_{name}'] = np.clip(trainer.model(X_seq_tensor).numpy().flatten(), 0.001, 0.999)
 
+    # Sklearn models
     clean_df['xG_LogReg'] = np.clip(logreg_trainer.model.predict_proba(X_scaled)[:, 1], 0.001, 0.999)
     clean_df['xG_RandomForest'] = np.clip(rf_trainer.model.predict_proba(X_scaled)[:, 1], 0.001, 0.999)
     clean_df['xG_HistGB'] = np.clip(hgb_trainer.model.predict_proba(X_scaled)[:, 1], 0.001, 0.999)
     clean_df['xG_MLP'] = np.clip(mlp_trainer.model.predict_proba(X_scaled)[:, 1], 0.001, 0.999)
 
+    # Calculate ensemble xG as the average of all 8 models
     own_cols = ['xG_XGBoost', 'xG_1D-CNN', 'xG_LSTM', 'xG_GRU', 'xG_LogReg', 'xG_RandomForest', 'xG_HistGB', 'xG_MLP']
     clean_df['xG_Ensemble'] = clean_df[own_cols].mean(axis=1)
 
@@ -91,10 +110,12 @@ def compute_goalie_predictions(file_bytes=None):
 
     return clean_df, goal_col, model_list, has_mp
 
+# Compute if the data source is the default training data or if a new CSV file is uploaded
 if data_source == "📂 Training data (shots.csv)" or uploaded_csv is not None:
     with st.spinner("Calculating goalies' GSAX statistics..."):
         df_goalies, goal_col, model_cols, has_mp = compute_goalie_predictions(uploaded_csv)
 
+    # Sidebar controls for model selection and minimum shots filter
     c_ctrl1, c_ctrl2 = st.columns(2)
     with c_ctrl1:
         default_idx = model_cols.index('xG_Ensemble') if 'xG_Ensemble' in model_cols else 0
@@ -114,6 +135,7 @@ if data_source == "📂 Training data (shots.csv)" or uploaded_csv is not None:
     g_df = df_goalies.groupby('goalieNameForShot', observed=False).agg(**agg_dict).reset_index()
     g_df = g_df[g_df['Shots_Faced'] >= min_shots].copy()
 
+    # Compute additional metrics: Save percentage, GSAX, and GSAX per 100 shots
     g_df['Save_%'] = ((1.0 - g_df['Goals_Allowed'] / g_df['Shots_Faced']) * 100).round(2)
     g_df['Expected_Goals (xG)'] = g_df['Expected_Goals (xG)'].round(2)
     g_df['GSAX (Model)'] = (g_df['Expected_Goals (xG)'] - g_df['Goals_Allowed']).round(2)

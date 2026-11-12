@@ -1,4 +1,8 @@
-# New page for validating new season data against MoneyPuck's xG model and our own models.
+"""
+New Season Data Validator Page for Streamlit App
+This script defines the Streamlit application that allows users to upload a new season's MoneyPuck CSV file and compare the 
+performance of 8 different machine learning models against MoneyPuck's official xG model (`xGoal`).
+"""
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -7,8 +11,10 @@ from sklearn.metrics import log_loss, brier_score_loss
 from model_loader import get_all_models
 from xwin_simul import GameWinSimulator
 
+# Page configs
 st.set_page_config(page_title="Season Data Validator", page_icon="📈", layout="wide")
 
+# Custom CSS-style (cards, font and colors)
 st.markdown("""
     <style>
     .main { background-color: #0e1117; }
@@ -18,11 +24,15 @@ st.markdown("""
 
 @st.cache_resource
 def load_validator_resources():
+    """
+    Load and cache all 8 models and the preprocessor for the Season Data Validator app.
+    """
     xgb_trainer, cnn_trainer, lstm_trainer, gru_trainer, logreg_trainer, rf_trainer, hgb_trainer, mlp_trainer = get_all_models()
     pre = logreg_trainer.pre
     simulator = GameWinSimulator(xgb_trainer)
     return xgb_trainer, cnn_trainer, lstm_trainer, gru_trainer, logreg_trainer, rf_trainer, hgb_trainer, mlp_trainer, pre, simulator
 
+# Load models, preprocessor, and simulator
 with st.spinner("Initializing models..."):
     xgb_trainer, cnn_trainer, lstm_trainer, gru_trainer, logreg_trainer, rf_trainer, hgb_trainer, mlp_trainer, pre, simulator = load_validator_resources()
 
@@ -30,11 +40,15 @@ st.title("📈 New data & season validation (vs. MoneyPuck)")
 st.markdown("Upload a new season's MoneyPuck CSV file and compare the performance of your **8 models + Ensemble** against MoneyPuck's official xG model (`xGoal`).")
 st.markdown("---")
 
+# File upload widget for new season CSV file
 uploaded_file = st.file_uploader("📂 Upload a new season's MoneyPuck CSV file (e.g., shots_2025.csv)", type=["csv"])
 
 if uploaded_file is not None:
     @st.cache_data
     def evaluate_uploaded_season(file_bytes):
+        """
+        Handles loaded data, evaluates all 8 models + Ensemble, and compares them to MoneyPuck's xGoal model.
+        """
         df_new = pd.read_csv(file_bytes)
         if 'game_id' in df_new.columns and 'time' in df_new.columns:
             df_new = df_new.sort_values(['game_id', 'time']).reset_index(drop=True)
@@ -42,7 +56,8 @@ if uploaded_file is not None:
             df_new = df_new.copy()
 
         goal_col = 'isGoal' if ('isGoal' in df_new.columns and 'goal' not in df_new.columns) else 'goal'
-        
+
+        # Create a new column for goalie tiers, where goalies not in the special list are labeled as "Average Tendie"
         special_goalies = set(xgb_trainer.goalie_options) - {"Average Tendie"}
         if 'goalieNameForShot' in df_new.columns:
             goalie_tier_series = df_new['goalieNameForShot'].apply(
@@ -60,6 +75,7 @@ if uploaded_file is not None:
         if has_moneypuck:
             required_cols.append('xGoal')
 
+        # Keep only the required columns and any relevant meta columns for game-level analysis
         meta_cols = [c for c in ['game_id', 'time', 'homeTeamCode', 'awayTeamCode', 'isHomeTeam', 'teamCode', 'shooterTeamCode'] if c in df_new.columns]
         keep_cols = list(dict.fromkeys(required_cols + meta_cols))
             
@@ -67,14 +83,14 @@ if uploaded_file is not None:
         if 'game_id' in clean_df.columns and 'time' in clean_df.columns:
             clean_df = clean_df.sort_values(['game_id', 'time']).reset_index(drop=True)
         
-        # 1. XGBoost predictions
+        # XGBoost predictions
         xgb_df = clean_df[active_features].copy()
         for col, cats in xgb_trainer.categories.items():
             if col in xgb_df.columns:
                 xgb_df[col] = pd.Categorical(xgb_df[col], categories=cats)
         clean_df['xG_XGBoost'] = np.clip(xgb_trainer.model.predict_proba(xgb_df)[:, 1], 0.001, 0.999)
 
-        # 2. PyTorch-based DNNs (CNN, LSTM, GRU)
+        # PyTorch-based DNNs (CNN, LSTM, GRU)
         X_scaled = pre.transform_batch(clean_df)
         X_seq = pre.transform_batch_sequences(clean_df)
         
@@ -89,12 +105,13 @@ if uploaded_file is not None:
                 preds = trainer.model(X_seq_tensor).numpy().flatten()
                 clean_df[f'xG_{name}'] = np.clip(preds, 0.001, 0.999)
 
-        # 3. Sklearn models predictions
+        # Sklearn models predictions
         clean_df['xG_LogReg'] = np.clip(logreg_trainer.model.predict_proba(X_scaled)[:, 1], 0.001, 0.999)
         clean_df['xG_RandomForest'] = np.clip(rf_trainer.model.predict_proba(X_scaled)[:, 1], 0.001, 0.999)
         clean_df['xG_HistGB'] = np.clip(hgb_trainer.model.predict_proba(X_scaled)[:, 1], 0.001, 0.999)
         clean_df['xG_MLP'] = np.clip(mlp_trainer.model.predict_proba(X_scaled)[:, 1], 0.001, 0.999)
 
+        # calculate ensemble xG as the average of all 8 models
         own_models = ['xG_XGBoost', 'xG_1D-CNN', 'xG_LSTM', 'xG_GRU', 'xG_LogReg', 'xG_RandomForest', 'xG_HistGB', 'xG_MLP']
         clean_df['xG_Ensemble'] = clean_df[own_models].mean(axis=1)
 
@@ -105,11 +122,13 @@ if uploaded_file is not None:
 
         return clean_df, goal_col, all_cols, has_moneypuck
 
+    # Evaluate the uploaded season data
     with st.spinner("Evaluating new season shots across all models..."):
         clean_df, goal_col, all_model_cols, has_mp = evaluate_uploaded_season(uploaded_file)
 
     st.success(f"✅ Uploaded and analyzed **{len(clean_df):,}** shots! {'(MoneyPuck xGoal included)' if has_mp else ''}")
 
+    # Model selection dropdown for detailed analysis
     default_idx = all_model_cols.index('xG_Ensemble') if 'xG_Ensemble' in all_model_cols else 0
     selected_xg_col = st.selectbox(
         "🤖 Choose a model for detailed analysis:",
@@ -117,6 +136,7 @@ if uploaded_file is not None:
         index=default_idx
     )
 
+    # 3 tabs for model performance, game-level xWin analysis, and team-level summary
     tab_models, tab_games, tab_teams = st.tabs([
         "📊 1. Model Performance (Accuracy & Loss)",
         "🎲 2. Game-level xWin Analysis",
@@ -155,6 +175,9 @@ if uploaded_file is not None:
         else:
             @st.cache_data
             def simulate_all_season_games(df_sub, xg_col, g_col, include_mp):
+                """"
+                Simulates all games in the season using the selected model's xG values and compares them to MoneyPuck's xG if available.
+                """
                 results = []
                 for gid, group in df_sub.groupby('game_id'):
                     home = group['homeTeamCode'].iloc[0] if 'homeTeamCode' in group.columns else 'HOME'
@@ -186,7 +209,7 @@ if uploaded_file is not None:
                         f"{model_label} xG (H - A)": f"{sim_own['home_xG']:.2f} - {sim_own['away_xG']:.2f}",
                     }
                     
-                    # 2. MoneyPuck xG simulation and comparison
+                    # MoneyPuck xG simulation and comparison
                     expected_winner_mp = None
                     correct_mp = None
                     if include_mp:
@@ -218,7 +241,8 @@ if uploaded_file is not None:
 
             decided_games = games_df[games_df["True Winner"] != "OT/SO"]
             accuracy_own = (decided_games["Favorite (Model)"] == decided_games["True Winner"]).mean() * 100 if len(decided_games) > 0 else 0.0
-            
+
+            # Display summary metrics for the season's game-level analysis
             c1, c2, c3 = st.columns(3)
             c1.metric("Played matches", f"{len(games_df)} kpl")
             c2.metric(f"xWin Winner Accuracy ({model_label})", f"{accuracy_own:.1f} %")
