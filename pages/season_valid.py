@@ -178,7 +178,7 @@ if uploaded_file is not None:
                     expected_winner_own = home if sim_own['home_win_prob'] >= 50.0 else away
                     correct_own = (actual_winner == expected_winner_own) if actual_winner != "OT/SO" else None
 
-                    # KORJATTU: Merkkijonot yhdellä rivillä ilman rivinvaihtovirheitä
+                    
                     row_data = {
                         "Game ID": gid,
                         "Game": f"{away} @ {home}",

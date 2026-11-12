@@ -75,18 +75,6 @@ shot_args = (
     selected_team, goalie_choice, selected_shot_type, is_rebound, is_rush
 )
 
-st.subheader("📊 Situation's impact on xG from same location")
-situations = {
-    "Basic Shot (Selected)": xgb_trainer.predict_shot(shot_distance, x_coord, y_coord, handedness, is_off_wing, selected_team, goalie_choice, selected_shot_type, 0, 0),
-    "Rush": xgb_trainer.predict_shot(shot_distance, x_coord, y_coord, handedness, is_off_wing, selected_team, goalie_choice, selected_shot_type, 0, 1),
-    "Rebound": xgb_trainer.predict_shot(shot_distance, x_coord, y_coord, handedness, is_off_wing, selected_team, goalie_choice, selected_shot_type, 1, 0),
-    "Rebound + Rush": xgb_trainer.predict_shot(shot_distance, x_coord, y_coord, handedness, is_off_wing, selected_team, goalie_choice, selected_shot_type, 1, 1)
-}
-sit_df = pd.DataFrame({
-    "Situation": list(situations.keys()),
-    "xG (%)": [v * 100 for v in situations.values()]
-})
-st.bar_chart(sit_df.set_index("Situation"), width='stretch')
 
 # Predictions from all 8 models
 all_predictions = {
@@ -156,6 +144,25 @@ with tab1:
             with m_cols[idx % 2]:
                 diff = xg_val - avg_xg
                 st.metric(label=model_name, value=f"{xg_val:.3f}", delta=f"{diff:+.3f}")
+    st.markdown("---")
+    st.subheader("📊 Situational impact on same shot position")
+    
+    situations = {
+        "Basic shots": xgb_trainer.predict_shot(shot_distance, x_coord, y_coord, handedness, is_off_wing, selected_team, goalie_choice, selected_shot_type, 0, 0),
+        "Rush": xgb_trainer.predict_shot(shot_distance, x_coord, y_coord, handedness, is_off_wing, selected_team, goalie_choice, selected_shot_type, 0, 1),
+        "Rebound": xgb_trainer.predict_shot(shot_distance, x_coord, y_coord, handedness, is_off_wing, selected_team, goalie_choice, selected_shot_type, 1, 0),
+        "Rebound + Rush": xgb_trainer.predict_shot(shot_distance, x_coord, y_coord, handedness, is_off_wing, selected_team, goalie_choice, selected_shot_type, 1, 1)
+    }
+    
+    # Display situational metrics in a row of cards
+    sit_cols = st.columns(4)
+    for idx, (sit_name, xg_val) in enumerate(situations.items()):
+        with sit_cols[idx]:
+            st.metric(
+                label=sit_name,
+                value=f"{xg_val * 100:.1f} %",
+                delta=f"{((xg_val - situations['Peruslaukaus']) * 100):+.1f}%" if idx > 0 else "Perustaso"
+            )
 
 with tab2:
     st.subheader("Team Statistics (Leaderboard)")

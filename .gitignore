@@ -1,4 +1,44 @@
-shots.csv
+# Python's cache and compiled files
 __pycache__/
-.streamlit/
-team_x_goals_summary.csv
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Large data files (MoneyPuck CSV:t)
+# Remove the comment (#) or the line if you want to force a small CSV file to be committed to Git
+*.csv
+!team_x_goals_summary.csv
+
+# Saved machine learning models and weights (if saving to disk)
+*.pkl
+*.joblib
+*.pt
+*.pth
+*.h5
+*.ubj
+*.model
+
+# Streamlit secrets file (contains sensitive information)
+.streamlit/secrets.toml
+
+# IDE and editor specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Operating system generated metadata files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs and temporary files
+*.log
+tmp/
+temp/
